@@ -12,18 +12,11 @@ import Photos
 
 final class CameraViewController: UIViewController {
     
-    private enum SessionSetupResult {
-        case success
-        case notAuthorized
-        case configurationFailed
-    }
-
     @IBOutlet private weak var previewView: PreviewView!
     @IBOutlet private weak var photoButton: UIButton!
     
     @objc dynamic var videoDeviceInput: AVCaptureDeviceInput!
     
-    private var setupResult: SessionSetupResult = .success
     private var inProgressPhotoCaptureDelegates = [Int64: PhotoCaptureProcessor]()
     private let session = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: "session queue") // Communicate with the session and other session objects on this queue.
@@ -37,23 +30,13 @@ final class CameraViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         sessionQueue.async {
-            switch self.setupResult {
-            case .success:
-                // Only setup observers and start the session running if setup succeeded.
-                self.session.startRunning()
-            case .notAuthorized:
-                assertionFailure("AVCaptureDevice is not authorized")
-            case .configurationFailed:
-                assertionFailure("AVCaptureDevice configuration Failed")
-            }
+            self.session.startRunning()
         }
     }
     
     override func viewWillDisappear(_ animated: Bool) {
         sessionQueue.async {
-            if self.setupResult == .success {
-                self.session.stopRunning()
-            }
+            self.session.stopRunning()
         }
         super.viewWillDisappear(animated)
     }
@@ -70,14 +53,12 @@ extension CameraViewController {
         case .notDetermined:
             sessionQueue.suspend()
             AVCaptureDevice.requestAccess(for: .video, completionHandler: { granted in
-                if !granted {
-                    self.setupResult = .notAuthorized
-                }
+                if !granted { fatalError() }
                 self.sessionQueue.resume()
             })
             
         default:
-            setupResult = .notAuthorized
+            fatalError()
         }
         
         sessionQueue.async {
@@ -86,10 +67,6 @@ extension CameraViewController {
     }
     
     private func configureSession() {
-        if setupResult != .success {
-            return
-        }
-        
         session.beginConfiguration()
         
         /*
@@ -99,77 +76,45 @@ extension CameraViewController {
         session.sessionPreset = .photo
         
         // Add video input.
-        do {
-            var defaultVideoDevice: AVCaptureDevice?
-            
-            // Choose the back dual camera if available, otherwise default to a wide angle camera.
-            
-            if let dualCameraDevice = AVCaptureDevice.default(.builtInDualCamera, for: .video, position: .back) {
-                defaultVideoDevice = dualCameraDevice
-            } else if let backCameraDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
-                // If a rear dual camera is not available, default to the rear wide angle camera.
-                defaultVideoDevice = backCameraDevice
-            } else if let frontCameraDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) {
-                // In the event that the rear wide angle camera isn't available, default to the front wide angle camera.
-                defaultVideoDevice = frontCameraDevice
-            }
-            guard let videoDevice = defaultVideoDevice else {
-                print("Default video device is unavailable.")
-                setupResult = .configurationFailed
-                session.commitConfiguration()
-                return
-            }
-            let videoDeviceInput = try AVCaptureDeviceInput(device: videoDevice)
-            
-            if session.canAddInput(videoDeviceInput) {
-                session.addInput(videoDeviceInput)
-                self.videoDeviceInput = videoDeviceInput
-                
-                DispatchQueue.main.async {
-                    var initialVideoOrientation: AVCaptureVideoOrientation = .portrait
-                    self.previewView.videoPreviewLayer.connection?.videoOrientation = initialVideoOrientation
-                }
-            } else {
-                print("Couldn't add video device input to the session.")
-                setupResult = .configurationFailed
-                session.commitConfiguration()
-                return
-            }
-        } catch {
-            print("Couldn't create video device input: \(error)")
-            setupResult = .configurationFailed
-            session.commitConfiguration()
-            return
-        }
+        var defaultVideoDevice: AVCaptureDevice?
         
+        // Choose the back dual camera if available, otherwise default to a wide angle camera.
+        if let dualCameraDevice = AVCaptureDevice.default(.builtInDualCamera, for: .video, position: .back) {
+            defaultVideoDevice = dualCameraDevice
+        } else if let backCameraDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
+            // If a rear dual camera is not available, default to the rear wide angle camera.
+            defaultVideoDevice = backCameraDevice
+        } else if let frontCameraDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) {
+            // In the event that the rear wide angle camera isn't available, default to the front wide angle camera.
+            defaultVideoDevice = frontCameraDevice
+        }
+        guard let videoDevice = defaultVideoDevice else { fatalError() }
+        let videoDeviceInput = try! AVCaptureDeviceInput(device: videoDevice)
+        
+        guard session.canAddInput(videoDeviceInput)  else { fatalError() }
+        session.addInput(videoDeviceInput)
+        self.videoDeviceInput = videoDeviceInput
+        
+        DispatchQueue.main.async {
+            let initialVideoOrientation: AVCaptureVideoOrientation = .portrait
+            self.previewView.videoPreviewLayer.connection?.videoOrientation = initialVideoOrientation
+        }
+
         // Add audio input.
-        do {
-            let audioDevice = AVCaptureDevice.default(for: .audio)
-            let audioDeviceInput = try AVCaptureDeviceInput(device: audioDevice!)
-            
-            if session.canAddInput(audioDeviceInput) {
-                session.addInput(audioDeviceInput)
-            } else {
-                print("Could not add audio device input to the session")
-            }
-        } catch {
-            print("Could not create audio device input: \(error)")
-        }
+        let audioDevice = AVCaptureDevice.default(for: .audio)
+        let audioDeviceInput = try! AVCaptureDeviceInput(device: audioDevice!)
         
+        guard session.canAddInput(audioDeviceInput) else { fatalError() }
+        session.addInput(audioDeviceInput)
+
         // Add photo output.
-        if session.canAddOutput(photoOutput) {
-            session.addOutput(photoOutput)
-            // NOTE: - Step1
-            photoOutput.isDepthDataDeliveryEnabled = photoOutput.isDepthDataDeliverySupported
-            // Needed to crash
-            photoOutput.isHighResolutionCaptureEnabled = true
-        } else {
-            print("Could not add photo output to the session")
-            setupResult = .configurationFailed
-            session.commitConfiguration()
-            return
-        }
-        
+        guard session.canAddOutput(photoOutput) else { fatalError() }
+        session.addOutput(photoOutput)
+        // NOTE: - Step1
+        photoOutput.isDepthDataDeliveryEnabled = photoOutput.isDepthDataDeliverySupported
+        // Needed to crash
+        photoOutput.isHighResolutionCaptureEnabled = true
+
         session.commitConfiguration()
     }
 
