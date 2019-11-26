@@ -203,68 +203,13 @@ extension CameraViewController {
 //            self.setRecommendedFrameRateRangeForPressureState(systemPressureState: systemPressureState)
         }
         keyValueObservations.append(systemPressureStateObservation)
-        
-        NotificationCenter.default.addObserver(self,
-                                               selector: #selector(subjectAreaDidChange),
-                                               name: .AVCaptureDeviceSubjectAreaDidChange,
-                                               object: videoDeviceInput.device)
-        
-        NotificationCenter.default.addObserver(self,
-                                               selector: #selector(sessionRuntimeError),
-                                               name: .AVCaptureSessionRuntimeError,
-                                               object: session)
-        
-        /*
-         A session can only run when the app is full screen. It will be interrupted
-         in a multi-app layout, introduced in iOS 9, see also the documentation of
-         AVCaptureSessionInterruptionReason. Add observers to handle these session
-         interruptions and show a preview is paused message. See the documentation
-         of AVCaptureSessionWasInterruptedNotification for other interruption reasons.
-         */
-        NotificationCenter.default.addObserver(self,
-                                               selector: #selector(sessionWasInterrupted),
-                                               name: .AVCaptureSessionWasInterrupted,
-                                               object: session)
-        NotificationCenter.default.addObserver(self,
-                                               selector: #selector(sessionInterruptionEnded),
-                                               name: .AVCaptureSessionInterruptionEnded,
-                                               object: session)
     }
     
-    private func removeObservers() {
-        NotificationCenter.default.removeObserver(self)
-        
+    private func removeObservers() {        
         for keyValueObservation in keyValueObservations {
             keyValueObservation.invalidate()
         }
         keyValueObservations.removeAll()
-    }
-    
-    @objc
-    func subjectAreaDidChange(notification: NSNotification) {
-        
-    }
-    
-    /// - Tag: HandleRuntimeError
-    @objc
-    func sessionRuntimeError(notification: NSNotification) {
-        guard let error = notification.userInfo?[AVCaptureSessionErrorKey] as? AVError else { return }
-        print("Capture session runtime error: \(error)")
-    }
-    
-    /// - Tag: HandleInterruption
-    @objc
-    func sessionWasInterrupted(notification: NSNotification) {
-        if let userInfoValue = notification.userInfo?[AVCaptureSessionInterruptionReasonKey] as AnyObject?,
-            let reasonIntegerValue = userInfoValue.integerValue,
-            let reason = AVCaptureSession.InterruptionReason(rawValue: reasonIntegerValue) {
-            print("Capture session was interrupted with reason \(reason)")
-        }
-    }
-    
-    @objc
-    func sessionInterruptionEnded(notification: NSNotification) {
-        print("Capture session interruption ended")
     }
 }
 
