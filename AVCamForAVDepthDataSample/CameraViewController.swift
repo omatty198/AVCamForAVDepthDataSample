@@ -24,7 +24,6 @@ final class CameraViewController: UIViewController {
     @objc dynamic var videoDeviceInput: AVCaptureDeviceInput!
     
     private var setupResult: SessionSetupResult = .success
-    private var keyValueObservations = [NSKeyValueObservation]()
     private var inProgressPhotoCaptureDelegates = [Int64: PhotoCaptureProcessor]()
     private let session = AVCaptureSession()
     private let sessionQueue = DispatchQueue(label: "session queue") // Communicate with the session and other session objects on this queue.
@@ -37,11 +36,25 @@ final class CameraViewController: UIViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        addObserverAndStartRunningAfterCheckAuthStatus()
+        sessionQueue.async {
+            switch self.setupResult {
+            case .success:
+                // Only setup observers and start the session running if setup succeeded.
+                self.session.startRunning()
+            case .notAuthorized:
+                assertionFailure("AVCaptureDevice is not authorized")
+            case .configurationFailed:
+                assertionFailure("AVCaptureDevice configuration Failed")
+            }
+        }
     }
     
     override func viewWillDisappear(_ animated: Bool) {
-        removeObserverAndStopRunning()
+        sessionQueue.async {
+            if self.setupResult == .success {
+                self.session.stopRunning()
+            }
+        }
         super.viewWillDisappear(animated)
     }
 }
@@ -160,57 +173,6 @@ extension CameraViewController {
         session.commitConfiguration()
     }
 
-}
-
-// MARK: - About observer
-extension CameraViewController {
-    private func addObserverAndStartRunningAfterCheckAuthStatus() {
-        sessionQueue.async {
-            switch self.setupResult {
-            case .success:
-                // Only setup observers and start the session running if setup succeeded.
-                self.addObservers()
-                self.session.startRunning()
-            case .notAuthorized:
-                assertionFailure("AVCaptureDevice is not authorized")
-            case .configurationFailed:
-                assertionFailure("AVCaptureDevice configuration Failed")
-            }
-        }
-    }
-    
-    private func removeObserverAndStopRunning() {
-        sessionQueue.async {
-            if self.setupResult == .success {
-                self.session.stopRunning()
-                self.removeObservers()
-            }
-        }
-    }
-    
-    private func addObservers() {
-        let keyValueObservation = session.observe(\.isRunning, options: .new) { _, change in
-            guard let isSessionRunning = change.newValue else { return }
-            
-            DispatchQueue.main.async {
-                self.photoButton.isEnabled = isSessionRunning
-            }
-        }
-        keyValueObservations.append(keyValueObservation)
-        
-        let systemPressureStateObservation = observe(\.videoDeviceInput.device.systemPressureState, options: .new) { _, change in
-            guard let systemPressureState = change.newValue else { return }
-//            self.setRecommendedFrameRateRangeForPressureState(systemPressureState: systemPressureState)
-        }
-        keyValueObservations.append(systemPressureStateObservation)
-    }
-    
-    private func removeObservers() {        
-        for keyValueObservation in keyValueObservations {
-            keyValueObservation.invalidate()
-        }
-        keyValueObservations.removeAll()
-    }
 }
 
 // MARK: - About Buttons
