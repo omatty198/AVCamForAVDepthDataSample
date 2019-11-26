@@ -100,13 +100,6 @@ extension CameraViewController {
             self.previewView.videoPreviewLayer.connection?.videoOrientation = initialVideoOrientation
         }
 
-        // Add audio input.
-        let audioDevice = AVCaptureDevice.default(for: .audio)
-        let audioDeviceInput = try! AVCaptureDeviceInput(device: audioDevice!)
-        
-        guard session.canAddInput(audioDeviceInput) else { fatalError() }
-        session.addInput(audioDeviceInput)
-
         // Add photo output.
         guard session.canAddOutput(photoOutput) else { fatalError() }
         session.addOutput(photoOutput)
