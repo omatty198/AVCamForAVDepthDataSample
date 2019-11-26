@@ -308,8 +308,6 @@ extension CameraViewController {
                         self.previewView.videoPreviewLayer.opacity = 1
                     }
                 }
-            }, livePhotoCaptureHandler: { capturing in
-                
             }, completionHandler: { photoCaptureProcessor in
                 // When the capture is complete, remove a reference to the photo capture delegate so it can be deallocated.
                 self.sessionQueue.async {
