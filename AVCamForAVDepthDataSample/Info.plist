@@ -22,8 +22,6 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>AVCamSample uses the camera to take photos and video.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>AVCamSample uses the microphone to record sound during Live Photos and movies.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>AVCamSample saves captured photos and videos to your photo library.</string>
 	<key>UIApplicationSceneManifest</key>
